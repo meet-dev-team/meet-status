@@ -4,14 +4,16 @@ const statusColors = {
     operational: '#10B981',
     degraded_performance: '#F59E0B',
     partial_outage: '#F97316',
-    major_outage: '#EF4444'
+    major_outage: '#EF4444',
+    offline: '#94a3b8' // Grey for offline/unknown
 };
 
 const statusLabels = {
     operational: 'Opérationnel',
     degraded_performance: 'Performance dégradée',
     partial_outage: 'Panne partielle',
-    major_outage: 'Panne majeure'
+    major_outage: 'Panne majeure',
+    offline: 'Hors ligne'
 };
 
 let currentPeriod = '24h';
@@ -38,38 +40,94 @@ document.addEventListener('DOMContentLoaded', () => {
 async function fetchStatus() {
     try {
         const response = await fetch(`${API_URL}?period=${currentPeriod}`);
+        if (!response.ok) throw new Error('Network response was not ok');
+        
         const json = await response.json();
 
         if (json.success) {
+            // Save to cache
+            localStorage.setItem('status_cache', JSON.stringify({
+                timestamp: Date.now(),
+                data: json.data
+            }));
+            
             updateUI(json.data);
             
             // Update timestamp
             const now = new Date();
             document.getElementById('last-updated').textContent = `Dernière vérification : ${now.toLocaleTimeString()}`;
+            document.querySelector('.loading-state').style.display = 'none'; // Ensure loading is hidden
         }
     } catch (error) {
         console.error('Failed to fetch status', error);
-        document.getElementById('global-status-text').textContent = 'Hors ligne';
-        document.getElementById('global-status-indicator').style.backgroundColor = statusColors.major_outage;
-        document.querySelector('.loading-state').textContent = 'Impossible de joindre le serveur Meet.';
-        document.getElementById('last-updated').textContent = `Dernière tentative : ${new Date().toLocaleTimeString()} (Échec)`;
+        handleOffline();
     }
 }
 
-function updateUI(data) {
-    const systemStatus = data.system.status;
+function handleOffline() {
+    // 1. Update Global Header
+    document.getElementById('global-status-text').textContent = 'Hors ligne';
+    document.getElementById('global-status-indicator').style.backgroundColor = statusColors.major_outage;
+    document.getElementById('global-status-indicator').classList.remove('pulse');
+    document.getElementById('last-updated').textContent = `Dernière tentative : ${new Date().toLocaleTimeString()} (Échec)`;
     
-    // Update Header
-    const globalIndicator = document.getElementById('global-status-indicator');
-    const globalText = document.getElementById('global-status-text');
-    
-    globalIndicator.style.backgroundColor = statusColors[systemStatus] || statusColors.operational;
-    globalText.textContent = systemStatus === 'operational' ? 'Tous les systèmes sont opérationnels' : statusLabels[systemStatus];
-    
-    if (systemStatus === 'operational') {
-        globalIndicator.className = 'status-indicator pulse';
+    // 2. Try to load cache
+    const cached = localStorage.getItem('status_cache');
+    let data = null;
+
+    if (cached) {
+        try {
+            const parsed = JSON.parse(cached);
+            data = parsed.data;
+            console.log('Loaded data from cache');
+        } catch (e) {
+            console.error('Cache parse error', e);
+        }
+    }
+
+    if (!data) {
+        // 3a. No cache -> serve default fallback
+        data = {
+            system: { status: 'offline' },
+            components: [
+                { name: 'API Core', status: 'offline' },
+                { name: 'Database', status: 'offline' },
+                { name: 'File Storage', status: 'offline' },
+                { name: 'Background Tasks', status: 'offline' }
+            ],
+            history: []
+        };
     } else {
-        globalIndicator.className = 'status-indicator';
+        // 3b. Cache exists -> Mark everything as offline visually but keep names
+        data.system.status = 'offline';
+        data.components = data.components.map(c => ({ ...c, status: 'offline', responseTime: undefined }));
+        
+        // Add a "now" point to history to show the drop/outage in the graph
+        if (data.history && data.history.length > 0) {
+            // We duplicate the last point but with a very high response time to indicate outage
+            // or we could just leave it as is, the graph will show the gap if we logic it right.
+            // For now, let's just use the history as is, the user will see old data.
+        }
+    }
+
+    updateUI(data, true);
+}
+
+function updateUI(data, isOffline = false) {
+    // Update Header (Only if not already handled by handleOffline, or to reset if back online)
+    if (!isOffline) {
+        const systemStatus = data.system.status;
+        const globalIndicator = document.getElementById('global-status-indicator');
+        const globalText = document.getElementById('global-status-text');
+        
+        globalIndicator.style.backgroundColor = statusColors[systemStatus] || statusColors.operational;
+        globalText.textContent = systemStatus === 'operational' ? 'Tous les systèmes sont opérationnels' : statusLabels[systemStatus];
+        
+        if (systemStatus === 'operational') {
+            globalIndicator.className = 'status-indicator pulse';
+        } else {
+            globalIndicator.className = 'status-indicator';
+        }
     }
 
     // Update Components List
@@ -86,6 +144,9 @@ function updateUI(data) {
         const name = document.createElement('span');
         name.className = 'component-name';
         name.textContent = component.name;
+        if (isOffline) {
+            name.style.color = '#999';
+        }
         
         nameGroup.appendChild(name);
 
@@ -101,8 +162,9 @@ function updateUI(data) {
 
         const statusText = document.createElement('span');
         statusText.className = 'component-status';
-        statusText.style.color = statusColors[component.status];
-        statusText.textContent = statusLabels[component.status];
+        // Force offline color if offline
+        statusText.style.color = isOffline ? statusColors.offline : (statusColors[component.status] || '#ccc');
+        statusText.textContent = isOffline ? 'Hors ligne' : statusLabels[component.status];
         
         statusGroup.appendChild(statusText);
         
@@ -113,7 +175,7 @@ function updateUI(data) {
 
     // Update Chart with historical data
     if (data.history) {
-        drawChart(data.history);
+        drawChart(data.history, isOffline);
     }
 }
 
@@ -121,7 +183,7 @@ function updateUI(data) {
 const canvas = document.getElementById('response-chart');
 const ctx = canvas.getContext('2d');
 
-function drawChart(data) {
+function drawChart(data, isOffline = false) {
     // Reset canvas size for high DPI
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
@@ -145,16 +207,18 @@ function drawChart(data) {
     }
 
     // Determine Y scale (max response time)
-    // Minimum 100ms, otherwise max from data + 20%
-    const maxVal = Math.max(100, ...data.map(d => d.response_time)) * 1.2;
+    let maxVal = Math.max(100, ...data.map(d => d.response_time)) * 1.2;
+    if (isOffline) maxVal = Math.max(maxVal, 500); // Ensure we have headroom to show "offline" state if we wanted
 
     // Helper to map data to coordinates
     const timeStart = new Date(data[0].created_at).getTime();
     const timeEnd = new Date(data[data.length - 1].created_at).getTime();
-    const timeRange = timeEnd - timeStart;
+    
+    // If offline, extend the time range to "now" to show the gap
+    const now = Date.now();
+    const timeRange = (isOffline ? now : timeEnd) - timeStart;
 
-    const getX = (item) => {
-        const time = new Date(item.created_at).getTime();
+    const getX = (time) => {
         return padding.left + ((time - timeStart) / timeRange) * chartWidth;
     };
 
@@ -185,28 +249,32 @@ function drawChart(data) {
     // Draw Graph Line
     ctx.beginPath();
     data.forEach((item, index) => {
-        const x = getX(item);
+        const x = getX(new Date(item.created_at).getTime());
         const y = getY(item.response_time);
         
         if (index === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
     });
     
+    // If offline, draw a line to "now" at 0 or max? 
+    // Usually status pages stop the line where data stopped.
+    // Let's just stop where data stopped.
+    
     ctx.strokeStyle = '#017EFF';
+    if (isOffline) ctx.strokeStyle = '#94a3b8'; // Grey line if offline data
     ctx.lineWidth = 2;
     ctx.stroke();
 
     // Fill Area under graph
-    ctx.lineTo(padding.left + chartWidth, padding.top + chartHeight);
-    ctx.lineTo(padding.left, padding.top + chartHeight);
-    ctx.fillStyle = 'rgba(1, 126, 255, 0.1)';
+    ctx.lineTo(getX(new Date(data[data.length-1].created_at).getTime()), padding.top + chartHeight);
+    ctx.lineTo(getX(new Date(data[0].created_at).getTime()), padding.top + chartHeight);
+    ctx.fillStyle = isOffline ? 'rgba(148, 163, 184, 0.1)' : 'rgba(1, 126, 255, 0.1)';
     ctx.fill();
 
     // Draw X Axis Labels (Time)
     ctx.fillStyle = '#999';
     ctx.textAlign = 'center';
     
-    // Choose label format based on period
     const labelCount = 5;
     for (let i = 0; i < labelCount; i++) {
         const ratio = i / (labelCount - 1);
