@@ -1,6 +1,4 @@
 const API_URL = 'https://meet.baptisteaussant.com/api/status-data'; 
-// Note: For local development, you might want to switch this to 'http://localhost:3000/api/status-data'
-// or implementing a simple environment switch based on window.location.hostname
 
 const statusColors = {
     operational: '#10B981',
