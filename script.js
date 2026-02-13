@@ -49,7 +49,7 @@ async function fetchStatus() {
         }
     } catch (error) {
         console.error('Failed to fetch status', error);
-        document.getElementById('global-status-text').textContent = 'Erreur de connexion';
+        document.getElementById('global-status-text').textContent = 'Hors ligne';
         document.getElementById('global-status-indicator').style.backgroundColor = statusColors.major_outage;
         document.querySelector('.loading-state').textContent = 'Impossible de joindre le serveur Meet.';
         document.getElementById('last-updated').textContent = `Dernière tentative : ${new Date().toLocaleTimeString()} (Échec)`;
