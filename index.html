@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>État du Service - Meet</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <span>Meet API Status</span>
+            </div>
+            <a href="https://meet.baptisteaussant.com" class="back-link">&larr; Retour au site</a>
+        </div>
+
+        <div class="status-overview">
+            <div class="status-text-group">
+                <div id="global-status-indicator" class="status-indicator"></div>
+                <h1 id="global-status-text" class="headline">Chargement de l'état...</h1>
+            </div>
+            <div class="last-checked" id="last-updated">Dernière vérification : -</div>
+        </div>
+
+        <div class="components-section">
+            <h2 class="section-title">État des Services</h2>
+            <div id="components-list">
+                <div class="loading-state">Connexion au serveur...</div>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <div class="chart-header">
+                <span class="chart-title">Temps de Réponse API</span>
+                <div class="chart-controls">
+                    <button class="period-btn active" data-period="24h">24h</button>
+                    <button class="period-btn" data-period="7d">7 jours</button>
+                    <button class="period-btn" data-period="30d">30 jours</button>
+                </div>
+            </div>
+            <canvas id="response-chart"></canvas>
+        </div>
+
+        <div class="footer">
+            <p>Page de status indépendante. Données fournies par Meet API.</p>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
