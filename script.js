@@ -56,7 +56,6 @@ async function fetchStatus() {
             // Update timestamp
             const now = new Date();
             document.getElementById('last-updated').textContent = `Dernière vérification : ${now.toLocaleTimeString()}`;
-            document.querySelector('.loading-state').style.display = 'none'; // Ensure loading is hidden
         }
     } catch (error) {
         console.error('Failed to fetch status', error);
