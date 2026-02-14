@@ -457,7 +457,9 @@ function drawChart(data, isOffline = false, mousePos = null) {
         let p1 = null;
         let p2 = null;
         let isInGap = false;
+        let gapInfo = null;
 
+        // Vérifier si on est dans un gap
         if (hasGapMarkers) {
             for (let i = 0; i < data.length; i++) {
                 if (data[i].is_gap) {
@@ -465,26 +467,123 @@ function drawChart(data, isOffline = false, mousePos = null) {
                     const gapEnd = new Date(data[i].created_at_end).getTime();
                     if (timeAtCursor >= gapStart && timeAtCursor <= gapEnd) {
                         isInGap = true;
+                        gapInfo = {
+                            start: gapStart,
+                            end: gapEnd,
+                            startDate: new Date(gapStart),
+                            endDate: new Date(gapEnd)
+                        };
                         break;
                     }
                 }
             }
         } else {
+            // Ancien système : vérifier les gaps avec threshold
             const GAP_THRESHOLD = 15 * 60 * 1000;
             for (let i = 0; i < realDataPoints.length - 1; i++) {
                 const t1 = new Date(realDataPoints[i].created_at).getTime();
                 const t2 = new Date(realDataPoints[i+1].created_at).getTime();
                 if (timeAtCursor >= t1 && timeAtCursor <= t2 && (t2 - t1 > GAP_THRESHOLD)) {
                     isInGap = true;
+                    gapInfo = {
+                        start: t1,
+                        end: t2,
+                        startDate: new Date(t1),
+                        endDate: new Date(t2)
+                    };
                     break;
                 }
             }
         }
 
-        if (isInGap) {
-            return;
+        // SI ON EST DANS UN GAP - Afficher tooltip "Hors ligne"
+        if (isInGap && gapInfo) {
+            const x = mousePos.x;
+            
+            // Calculer la position Y (au milieu du graphique)
+            const y = padding.top + chartHeight / 2;
+
+            // Draw vertical line ROUGE
+            ctx.beginPath();
+            ctx.moveTo(x, padding.top);
+            ctx.lineTo(x, padding.top + chartHeight);
+            ctx.strokeStyle = '#EF4444';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Draw Circle rouge
+            ctx.beginPath();
+            ctx.arc(x, y, 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+            ctx.strokeStyle = '#EF4444';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Calculer la durée du crash
+            const durationMs = gapInfo.end - gapInfo.start;
+            const durationMinutes = Math.round(durationMs / 60000);
+            const durationHours = Math.floor(durationMinutes / 60);
+            const remainingMinutes = durationMinutes % 60;
+            
+            let durationText = '';
+            if (durationHours > 0) {
+                durationText = `${durationHours}h${remainingMinutes > 0 ? remainingMinutes + 'm' : ''}`;
+            } else {
+                durationText = `${durationMinutes}min`;
+            }
+
+            // Draw Tooltip Box - ROUGE avec "Hors ligne"
+            const startTimeStr = gapInfo.startDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+            const endTimeStr = gapInfo.endDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+            const tooltipText = `🔴 Hors ligne (${durationText})`;
+            const tooltipSubText = `${startTimeStr} → ${endTimeStr}`;
+            
+            ctx.font = 'bold 12px sans-serif';
+            const textWidth1 = ctx.measureText(tooltipText).width;
+            ctx.font = '11px sans-serif';
+            const textWidth2 = ctx.measureText(tooltipSubText).width;
+            const boxWidth = Math.max(textWidth1, textWidth2) + 24;
+            const boxHeight = 45;
+
+            let boxX = x - boxWidth / 2;
+            let boxY = y - 55;
+            if (boxX < 5) boxX = 5;
+            if (boxX + boxWidth > width - 5) boxX = width - boxWidth - 5;
+            if (boxY < 5) boxY = y + 20;
+
+            // Ombre du tooltip
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+            ctx.shadowBlur = 10;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 2;
+
+            // Fond rouge foncé pour le tooltip
+            ctx.fillStyle = 'rgba(220, 38, 38, 0.95)';
+            ctx.beginPath();
+            ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 6);
+            ctx.fill();
+
+            // Reset shadow
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+
+            // Texte du tooltip
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'center';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.fillText(tooltipText, boxX + boxWidth / 2, boxY + 18);
+            ctx.font = '11px sans-serif';
+            ctx.fillText(tooltipSubText, boxX + boxWidth / 2, boxY + 33);
+            
+            return; // Ne pas afficher le tooltip normal
         }
 
+        // SINON - Chercher les points réels autour du curseur (tooltip normal)
         for (let i = 0; i < realDataPoints.length - 1; i++) {
             const t1 = new Date(realDataPoints[i].created_at).getTime();
             const t2 = new Date(realDataPoints[i+1].created_at).getTime();
@@ -496,6 +595,7 @@ function drawChart(data, isOffline = false, mousePos = null) {
             }
         }
 
+        // If we found the interval (tooltip normal bleu)
         if (p1 && p2) {
             const t1 = new Date(p1.created_at).getTime();
             const t2 = new Date(p2.created_at).getTime();
@@ -520,7 +620,7 @@ function drawChart(data, isOffline = false, mousePos = null) {
 
             // Draw Circle
             ctx.beginPath();
-            ctx.arc(x, y, 5, 0, Math.PI * 2); // Plus grand sur mobile
+            ctx.arc(x, y, 5, 0, Math.PI * 2);
             ctx.fillStyle = '#fff';
             ctx.fill();
             ctx.strokeStyle = isOffline ? '#94a3b8' : '#017EFF';
@@ -534,7 +634,7 @@ function drawChart(data, isOffline = false, mousePos = null) {
             const valStr = `${Math.round(interpolatedValue)} ms`;
 
             const tooltipText = `${dateStr} ${timeStr} - ${valStr}`;
-            ctx.font = '12px sans-serif'; // Font plus grande sur mobile
+            ctx.font = '12px sans-serif';
             const textWidth = ctx.measureText(tooltipText).width;
             const boxWidth = textWidth + 24;
             const boxHeight = 30;
