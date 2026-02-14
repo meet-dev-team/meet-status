@@ -360,13 +360,14 @@ function drawChart(data, isOffline = false, mousePos = null) {
                 const startTime = new Date(item.created_at).getTime();
                 const endTime = new Date(item.created_at_end).getTime();
                 
-                // ✅ Ne tracer le gap que s'il est dans la période visible
-                if (endTime < timeStart || startTime > timeEnd) return;
+                // ✅ Ne tracer le gap que s'il intersecte avec la période visible
+                if (endTime < timeStart) return; // Trop ancien, on ignore
                 
                 ctx.stroke();
                 
-                const startX = getX(Math.max(startTime, timeStart)); // Limiter au début de la zone
-                const endX = getX(Math.min(endTime, timeEnd)); // Limiter à la fin de la zone
+                // Limiter aux bords de la zone visible
+                const startX = getX(Math.max(startTime, timeStart));
+                const endX = getX(Math.min(endTime, timeEnd));
                 
                 let prevY = padding.top + chartHeight / 2;
                 let nextY = padding.top + chartHeight / 2;
@@ -402,8 +403,8 @@ function drawChart(data, isOffline = false, mousePos = null) {
 
             const time = new Date(item.created_at).getTime();
             
-            // ✅ Ne tracer que les points dans la période visible
-            if (time < timeStart || time > timeEnd) return;
+            // ✅ Ne filtrer que les points trop anciens (pas ceux qui sont récents)
+            if (time < timeStart) return;
             
             const x = getX(time);
             const y = getY(item.response_time);
@@ -428,8 +429,8 @@ function drawChart(data, isOffline = false, mousePos = null) {
         realDataPoints.forEach((item, index) => {
             const time = new Date(item.created_at).getTime();
             
-            // ✅ Ne tracer que les points dans la période visible
-            if (time < timeStart || time > timeEnd) return;
+            // ✅ Ne filtrer que les points trop anciens (pas ceux qui sont récents)
+            if (time < timeStart) return;
             
             const x = getX(time);
             const y = getY(item.response_time);
