@@ -212,20 +212,23 @@ function drawChart(data, isOffline = false, mousePos = null) {
 
     ctx.clearRect(0, 0, width, height);
 
-    if (data.length < 2) {
+    // Filtrer les données pour ne garder que les points réels (pas les marqueurs de gap)
+    const realDataPoints = data.filter(d => !d.is_gap);
+
+    if (realDataPoints.length < 2) {
         ctx.fillStyle = '#666';
         ctx.textAlign = 'center';
         ctx.fillText('Pas assez de données pour afficher le graphique', width / 2, height / 2);
         return;
     }
 
-    // Determine Y scale (max response time)
-    let maxVal = Math.max(100, ...data.map(d => d.response_time)) * 1.2;
+    // Determine Y scale (max response time) - uniquement sur les points réels
+    let maxVal = Math.max(100, ...realDataPoints.map(d => d.response_time)) * 1.2;
     if (isOffline) maxVal = Math.max(maxVal, 500);
 
     // Helper to map data to coordinates
-    const timeStart = new Date(data[0].created_at).getTime();
-    const timeEnd = new Date(data[data.length - 1].created_at).getTime();
+    const timeStart = new Date(realDataPoints[0].created_at).getTime();
+    const timeEnd = new Date(realDataPoints[realDataPoints.length - 1].created_at).getTime();
     
     // If offline, use "now" as end of range to show gap until present
     const now = Date.now();
@@ -258,48 +261,74 @@ function drawChart(data, isOffline = false, mousePos = null) {
     }
     ctx.stroke();
 
-    // Draw Graph Line with GAP DETECTION
+    // Draw Graph Line with GAP DETECTION FROM DATABASE
     const defaultColor = isOffline ? '#94a3b8' : '#017EFF';
     ctx.strokeStyle = defaultColor;
     ctx.lineWidth = 2;
     ctx.setLineDash([]);
     ctx.beginPath();
-    
-    const GAP_THRESHOLD = 15 * 60 * 1000; // 15 minutes gap
+
+    let lastRealPointIndex = 0;
 
     data.forEach((item, index) => {
+        // Si c'est un marqueur de gap de la DB
+        if (item.is_gap) {
+            // 1. Finir la ligne actuelle
+            ctx.stroke();
+            
+            // 2. Dessiner la ligne rouge en pointillés pour le gap
+            const startTime = new Date(item.created_at).getTime();
+            const endTime = new Date(item.created_at_end).getTime();
+            const startX = getX(startTime);
+            const endX = getX(endTime);
+            
+            // Trouver les Y des points avant et après le gap
+            let prevY = padding.top + chartHeight / 2;
+            let nextY = padding.top + chartHeight / 2;
+            
+            // Point avant le gap
+            if (lastRealPointIndex < realDataPoints.length) {
+                for (let i = lastRealPointIndex; i < realDataPoints.length; i++) {
+                    const pointTime = new Date(realDataPoints[i].created_at).getTime();
+                    if (pointTime <= startTime) {
+                        prevY = getY(realDataPoints[i].response_time);
+                        lastRealPointIndex = i;
+                    } else {
+                        nextY = getY(realDataPoints[i].response_time);
+                        break;
+                    }
+                }
+            }
+            
+            ctx.beginPath();
+            ctx.moveTo(startX, prevY);
+            ctx.lineTo(endX, nextY);
+            ctx.strokeStyle = '#EF4444'; // Rouge
+            ctx.setLineDash([4, 4]);
+            ctx.stroke();
+            
+            // 3. Reprendre la ligne normale
+            ctx.beginPath();
+            ctx.strokeStyle = defaultColor;
+            ctx.setLineDash([]);
+            ctx.moveTo(endX, nextY);
+            
+            return;
+        }
+
+        // Traiter les points de données normaux
         const time = new Date(item.created_at).getTime();
         const x = getX(time);
         const y = getY(item.response_time);
-        
+
         if (index === 0) {
             ctx.moveTo(x, y);
         } else {
+            // Vérifier si le point précédent était un gap
             const prevItem = data[index - 1];
-            const prevTime = new Date(prevItem.created_at).getTime();
-            
-            if (time - prevTime > GAP_THRESHOLD) {
-                 // --- GAP DETECTED ---
-                 
-                 // 1. Draw the valid line up to previous point
-                 ctx.stroke();
-
-                 // 2. Draw the GAP line (Red Dashed)
-                 const prevX = getX(prevTime);
-                 const prevY = getY(prevItem.response_time);
-
-                 ctx.beginPath();
-                 ctx.moveTo(prevX, prevY);
-                 ctx.lineTo(x, y);
-                 ctx.strokeStyle = '#EF4444'; // Red
-                 ctx.setLineDash([4, 4]);
-                 ctx.stroke();
-
-                 // 3. Prepare for next valid line
-                 ctx.beginPath();
-                 ctx.strokeStyle = defaultColor; // Back to blue/grey
-                 ctx.setLineDash([]);
-                 ctx.moveTo(x, y);
+            if (prevItem && prevItem.is_gap) {
+                // Ne pas tracer de ligne, juste se déplacer au nouveau point
+                ctx.moveTo(x, y);
             } else {
                 ctx.lineTo(x, y);
             }
@@ -335,27 +364,41 @@ function drawChart(data, isOffline = false, mousePos = null) {
         const ratio = (mousePos.x - padding.left) / chartWidth;
         const timeAtCursor = timeStart + ratio * timeRange;
         
-        // Find surrounding data points
-        // data is sorted by created_at usually
+        // Find surrounding data points (dans les points réels uniquement)
         let p1 = null;
         let p2 = null;
+        let isInGap = false;
 
-        for (let i = 0; i < data.length - 1; i++) {
-            const t1 = new Date(data[i].created_at).getTime();
-            const t2 = new Date(data[i+1].created_at).getTime();
-            // Check if we are inside a gap
-            if (timeAtCursor >= t1 && timeAtCursor <= t2) {
-                if (t2 - t1 > GAP_THRESHOLD) {
-                    // We are in a gap! Don't show tooltip, or show "Data missing"
-                    return; 
+        // Vérifier d'abord si on est dans un gap
+        for (let i = 0; i < data.length; i++) {
+            if (data[i].is_gap) {
+                const gapStart = new Date(data[i].created_at).getTime();
+                const gapEnd = new Date(data[i].created_at_end).getTime();
+                if (timeAtCursor >= gapStart && timeAtCursor <= gapEnd) {
+                    isInGap = true;
+                    break;
                 }
-                p1 = data[i];
-                p2 = data[i+1];
+            }
+        }
+
+        // Si on est dans un gap, ne pas afficher le tooltip
+        if (isInGap) {
+            return;
+        }
+
+        // Chercher les points réels autour du curseur
+        for (let i = 0; i < realDataPoints.length - 1; i++) {
+            const t1 = new Date(realDataPoints[i].created_at).getTime();
+            const t2 = new Date(realDataPoints[i+1].created_at).getTime();
+            
+            if (timeAtCursor >= t1 && timeAtCursor <= t2) {
+                p1 = realDataPoints[i];
+                p2 = realDataPoints[i+1];
                 break;
             }
         }
 
-        // If we found the interval and it's not a gap
+        // If we found the interval
         if (p1 && p2) {
             const t1 = new Date(p1.created_at).getTime();
             const t2 = new Date(p2.created_at).getTime();
@@ -383,6 +426,7 @@ function drawChart(data, isOffline = false, mousePos = null) {
             ctx.arc(x, y, 4, 0, Math.PI * 2);
             ctx.fillStyle = '#fff';
             ctx.fill();
+            ctx.strokeStyle = isOffline ? '#94a3b8' : '#017EFF';
             ctx.stroke();
 
             // Draw Tooltip Box
