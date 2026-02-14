@@ -302,68 +302,82 @@ function drawChart(data, isOffline = false, mousePos = null) {
     }
 
     // DRAW TOOLTIP if mousePos exists
-    if (mousePos) {
-        // Find closest point
-        // Map mouse X back to time? No, easiest is to iterate points since there aren't many
-        let closest = null;
-        let minDist = Infinity;
+    if (mousePos && mousePos.x >= padding.left && mousePos.x <= padding.left + chartWidth) {
+        // Calculate exact time at mouse position
+        const ratio = (mousePos.x - padding.left) / chartWidth;
+        const timeAtCursor = timeStart + ratio * timeRange;
         
-        // Only look at points within the chart area horizontally
-        if (mousePos.x >= padding.left && mousePos.x <= padding.left + chartWidth) {
-            points.forEach(p => {
-                const dist = Math.abs(p.x - mousePos.x); // calculate distance in pixels from mouse X
-                if (dist < minDist) {
-                    minDist = dist;
-                    closest = p;
-                }
-            });
+        // Find surrounding data points
+        // data is sorted by created_at usually
+        let p1 = null;
+        let p2 = null;
 
-            if (closest && minDist < 50) { // Snap if within 50px
-                // Draw vertical line
-                ctx.beginPath();
-                ctx.moveTo(closest.x, padding.top);
-                ctx.lineTo(closest.x, padding.top + chartHeight);
-                ctx.strokeStyle = isOffline ? '#94a3b8' : '#017EFF';
-                ctx.lineWidth = 1;
-                ctx.setLineDash([5, 5]);
-                ctx.stroke();
-                ctx.setLineDash([]);
-
-                // Draw Circle at point
-                ctx.beginPath();
-                ctx.arc(closest.x, closest.y, 4, 0, Math.PI * 2);
-                ctx.fillStyle = '#fff';
-                ctx.fill();
-                ctx.stroke();
-
-                // Draw Tooltip Box
-                const date = new Date(closest.item.created_at);
-                const timeStr = date.toLocaleTimeString();
-                const dateStr = date.toLocaleDateString();
-                const valStr = `${closest.item.response_time} ms`;
-
-                const tooltipText = `${dateStr} ${timeStr} - ${valStr}`;
-                const textWidth = ctx.measureText(tooltipText).width;
-                const boxWidth = textWidth + 20;
-                const boxHeight = 25;
-                const boxPadding = 5;
-
-                // Position tooltip (avoid going off canvas)
-                let boxX = closest.x - boxWidth / 2;
-                let boxY = closest.y - 35;
-                if (boxX < 0) boxX = 5;
-                if (boxX + boxWidth > width) boxX = width - boxWidth - 5;
-                if (boxY < 0) boxY = closest.y + 15;
-
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-                ctx.beginPath();
-                ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 4);
-                ctx.fill();
-
-                ctx.fillStyle = '#fff';
-                ctx.textAlign = 'center';
-                ctx.fillText(tooltipText, boxX + boxWidth / 2, boxY + 16);
+        for (let i = 0; i < data.length - 1; i++) {
+            const t1 = new Date(data[i].created_at).getTime();
+            const t2 = new Date(data[i+1].created_at).getTime();
+            if (timeAtCursor >= t1 && timeAtCursor <= t2) {
+                p1 = data[i];
+                p2 = data[i+1];
+                break;
             }
+        }
+
+        // If we found the interval
+        if (p1 && p2) {
+            const t1 = new Date(p1.created_at).getTime();
+            const t2 = new Date(p2.created_at).getTime();
+            const factor = (timeAtCursor - t1) / (t2 - t1);
+            
+            const v1 = p1.response_time;
+            const v2 = p2.response_time;
+            const interpolatedValue = v1 + factor * (v2 - v1);
+
+            const x = mousePos.x; // Exact mouse X
+            const y = getY(interpolatedValue); // Encoded Y
+
+            // Draw vertical line
+            ctx.beginPath();
+            ctx.moveTo(x, padding.top);
+            ctx.lineTo(x, padding.top + chartHeight);
+            ctx.strokeStyle = isOffline ? '#94a3b8' : '#017EFF';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Draw Circle at interpolated point
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+            ctx.stroke();
+
+            // Draw Tooltip Box
+            const date = new Date(timeAtCursor);
+            const timeStr = date.toLocaleTimeString();
+            const dateStr = date.toLocaleDateString();
+            const valStr = `${Math.round(interpolatedValue)} ms`;
+
+            const tooltipText = `${dateStr} ${timeStr} - ${valStr}`;
+            const textWidth = ctx.measureText(tooltipText).width;
+            const boxWidth = textWidth + 20;
+            const boxHeight = 25;
+
+            // Position tooltip
+            let boxX = x - boxWidth / 2;
+            let boxY = y - 35;
+            if (boxX < 0) boxX = 5;
+            if (boxX + boxWidth > width) boxX = width - boxWidth - 5;
+            if (boxY < 0) boxY = y + 15;
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.beginPath();
+            ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 4);
+            ctx.fill();
+
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'center';
+            ctx.fillText(tooltipText, boxX + boxWidth / 2, boxY + 16);
         }
     }
 }
