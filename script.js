@@ -18,6 +18,8 @@ const statusLabels = {
 
 let currentPeriod = '24h';
 let updateInterval = null;
+let chartData = null; // Store data for chart interaction
+let isDataOffline = false; // Store offline state for chart
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -31,6 +33,22 @@ document.addEventListener('DOMContentLoaded', () => {
             currentPeriod = e.target.dataset.period;
             fetchStatus();
         });
+    });
+
+    // Chart Interaction
+    const canvas = document.getElementById('response-chart');
+    
+    canvas.addEventListener('mousemove', (e) => {
+        if (!chartData || chartData.length < 2) return;
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        drawChart(chartData, isDataOffline, { x, y });
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+        if (!chartData) return;
+        drawChart(chartData, isDataOffline, null); // Clear tooltip
     });
 
     // Polling every 60 seconds
@@ -100,19 +118,15 @@ function handleOffline() {
         // 3b. Cache exists -> Mark everything as offline visually but keep names
         data.system.status = 'offline';
         data.components = data.components.map(c => ({ ...c, status: 'offline', responseTime: undefined }));
-        
-        // Add a "now" point to history to show the drop/outage in the graph
-        if (data.history && data.history.length > 0) {
-            // We duplicate the last point but with a very high response time to indicate outage
-            // or we could just leave it as is, the graph will show the gap if we logic it right.
-            // For now, let's just use the history as is, the user will see old data.
-        }
     }
 
     updateUI(data, true);
 }
 
 function updateUI(data, isOffline = false) {
+    chartData = data.history; // Store for interaction
+    isDataOffline = isOffline;
+
     // Update Header (Only if not already handled by handleOffline, or to reset if back online)
     if (!isOffline) {
         const systemStatus = data.system.status;
@@ -182,7 +196,7 @@ function updateUI(data, isOffline = false) {
 const canvas = document.getElementById('response-chart');
 const ctx = canvas.getContext('2d');
 
-function drawChart(data, isOffline = false) {
+function drawChart(data, isOffline = false, mousePos = null) {
     // Reset canvas size for high DPI
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
@@ -207,13 +221,12 @@ function drawChart(data, isOffline = false) {
 
     // Determine Y scale (max response time)
     let maxVal = Math.max(100, ...data.map(d => d.response_time)) * 1.2;
-    if (isOffline) maxVal = Math.max(maxVal, 500); // Ensure we have headroom to show "offline" state if we wanted
+    if (isOffline) maxVal = Math.max(maxVal, 500);
 
     // Helper to map data to coordinates
     const timeStart = new Date(data[0].created_at).getTime();
     const timeEnd = new Date(data[data.length - 1].created_at).getTime();
     
-    // If offline, extend the time range to "now" to show the gap
     const now = Date.now();
     const timeRange = (isOffline ? now : timeEnd) - timeStart;
 
@@ -230,7 +243,6 @@ function drawChart(data, isOffline = false) {
     ctx.lineWidth = 1;
     ctx.beginPath();
     
-    // Draw 4 horizontal lines
     for (let i = 0; i <= 4; i++) {
         const y = padding.top + (i / 4) * chartHeight;
         ctx.moveTo(padding.left, y);
@@ -247,20 +259,19 @@ function drawChart(data, isOffline = false) {
 
     // Draw Graph Line
     ctx.beginPath();
+    let points = [];
     data.forEach((item, index) => {
-        const x = getX(new Date(item.created_at).getTime());
+        const time = new Date(item.created_at).getTime();
+        const x = getX(time);
         const y = getY(item.response_time);
+        points.push({ x, y, item, time });
         
         if (index === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
     });
     
-    // If offline, draw a line to "now" at 0 or max? 
-    // Usually status pages stop the line where data stopped.
-    // Let's just stop where data stopped.
-    
     ctx.strokeStyle = '#017EFF';
-    if (isOffline) ctx.strokeStyle = '#94a3b8'; // Grey line if offline data
+    if (isOffline) ctx.strokeStyle = '#94a3b8'; 
     ctx.lineWidth = 2;
     ctx.stroke();
 
@@ -288,5 +299,71 @@ function drawChart(data, isOffline = false) {
         }
 
         ctx.fillText(label, x, height - 10);
+    }
+
+    // DRAW TOOLTIP if mousePos exists
+    if (mousePos) {
+        // Find closest point
+        // Map mouse X back to time? No, easiest is to iterate points since there aren't many
+        let closest = null;
+        let minDist = Infinity;
+        
+        // Only look at points within the chart area horizontally
+        if (mousePos.x >= padding.left && mousePos.x <= padding.left + chartWidth) {
+            points.forEach(p => {
+                const dist = Math.abs(p.x - mousePos.x); // calculate distance in pixels from mouse X
+                if (dist < minDist) {
+                    minDist = dist;
+                    closest = p;
+                }
+            });
+
+            if (closest && minDist < 50) { // Snap if within 50px
+                // Draw vertical line
+                ctx.beginPath();
+                ctx.moveTo(closest.x, padding.top);
+                ctx.lineTo(closest.x, padding.top + chartHeight);
+                ctx.strokeStyle = isOffline ? '#94a3b8' : '#017EFF';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([5, 5]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Draw Circle at point
+                ctx.beginPath();
+                ctx.arc(closest.x, closest.y, 4, 0, Math.PI * 2);
+                ctx.fillStyle = '#fff';
+                ctx.fill();
+                ctx.stroke();
+
+                // Draw Tooltip Box
+                const date = new Date(closest.item.created_at);
+                const timeStr = date.toLocaleTimeString();
+                const dateStr = date.toLocaleDateString();
+                const valStr = `${closest.item.response_time} ms`;
+
+                const tooltipText = `${dateStr} ${timeStr} - ${valStr}`;
+                const textWidth = ctx.measureText(tooltipText).width;
+                const boxWidth = textWidth + 20;
+                const boxHeight = 25;
+                const boxPadding = 5;
+
+                // Position tooltip (avoid going off canvas)
+                let boxX = closest.x - boxWidth / 2;
+                let boxY = closest.y - 35;
+                if (boxX < 0) boxX = 5;
+                if (boxX + boxWidth > width) boxX = width - boxWidth - 5;
+                if (boxY < 0) boxY = closest.y + 15;
+
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+                ctx.beginPath();
+                ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 4);
+                ctx.fill();
+
+                ctx.fillStyle = '#fff';
+                ctx.textAlign = 'center';
+                ctx.fillText(tooltipText, boxX + boxWidth / 2, boxY + 16);
+            }
+        }
     }
 }
