@@ -259,8 +259,13 @@ function drawChart(data, isOffline = false, mousePos = null) {
     ctx.stroke();
 
     // Draw Graph Line with GAP DETECTION
+    const defaultColor = isOffline ? '#94a3b8' : '#017EFF';
+    ctx.strokeStyle = defaultColor;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([]);
     ctx.beginPath();
-    const GAP_THRESHOLD = 15 * 60 * 1000; // 15 minutes gap = broken line
+    
+    const GAP_THRESHOLD = 15 * 60 * 1000; // 15 minutes gap
 
     data.forEach((item, index) => {
         const time = new Date(item.created_at).getTime();
@@ -270,11 +275,30 @@ function drawChart(data, isOffline = false, mousePos = null) {
         if (index === 0) {
             ctx.moveTo(x, y);
         } else {
-            const prevTime = new Date(data[index - 1].created_at).getTime();
+            const prevItem = data[index - 1];
+            const prevTime = new Date(prevItem.created_at).getTime();
+            
             if (time - prevTime > GAP_THRESHOLD) {
-                 // Gap detected: Stroke current path and start new one
+                 // --- GAP DETECTED ---
+                 
+                 // 1. Draw the valid line up to previous point
                  ctx.stroke();
+
+                 // 2. Draw the GAP line (Red Dashed)
+                 const prevX = getX(prevTime);
+                 const prevY = getY(prevItem.response_time);
+
                  ctx.beginPath();
+                 ctx.moveTo(prevX, prevY);
+                 ctx.lineTo(x, y);
+                 ctx.strokeStyle = '#EF4444'; // Red
+                 ctx.setLineDash([4, 4]);
+                 ctx.stroke();
+
+                 // 3. Prepare for next valid line
+                 ctx.beginPath();
+                 ctx.strokeStyle = defaultColor; // Back to blue/grey
+                 ctx.setLineDash([]);
                  ctx.moveTo(x, y);
             } else {
                 ctx.lineTo(x, y);
@@ -282,9 +306,6 @@ function drawChart(data, isOffline = false, mousePos = null) {
         }
     });
     
-    ctx.strokeStyle = '#017EFF';
-    if (isOffline) ctx.strokeStyle = '#94a3b8'; 
-    ctx.lineWidth = 2;
     // Stroke the final segment
     ctx.stroke();
 
