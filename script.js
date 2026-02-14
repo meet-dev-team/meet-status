@@ -287,6 +287,18 @@ function drawChart(data, isOffline = false, mousePos = null) {
     let periodMs;
     
     switch(currentPeriod) {
+        case '1h':
+            periodMs = 1 * 60 * 60 * 1000;
+            break;
+        case '2h':
+            periodMs = 2 * 60 * 60 * 1000;
+            break;
+        case '6h':
+            periodMs = 6 * 60 * 60 * 1000;
+            break;
+        case '12h':
+            periodMs = 12 * 60 * 60 * 1000;
+            break;
         case '24h':
             periodMs = 24 * 60 * 60 * 1000;
             break;
@@ -455,8 +467,19 @@ function drawChart(data, isOffline = false, mousePos = null) {
     ctx.font = '10px sans-serif';
     
     let labelCount = 5;
-    if (currentPeriod === '7d') labelCount = 7;
-    if (currentPeriod === '30d') labelCount = 6;
+    if (currentPeriod === '1h' || currentPeriod === '2h') {
+        labelCount = 6;
+    } else if (currentPeriod === '6h') {
+        labelCount = 7;
+    } else if (currentPeriod === '12h') {
+        labelCount = 7;
+    } else if (currentPeriod === '24h') {
+        labelCount = 6;
+    } else if (currentPeriod === '7d') {
+        labelCount = 7;
+    } else if (currentPeriod === '30d') {
+        labelCount = 6;
+    }
     
     for (let i = 0; i < labelCount; i++) {
         const ratio = i / (labelCount - 1);
@@ -464,11 +487,22 @@ function drawChart(data, isOffline = false, mousePos = null) {
         const time = new Date(timeStart + ratio * timeRange);
         
         let label = '';
-        if (currentPeriod === '24h') {
+        
+        // Format adapté selon la période
+        if (currentPeriod === '1h' || currentPeriod === '2h') {
+            // Très court : afficher heure:minute:seconde ou juste minute
+            label = time.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        } else if (currentPeriod === '6h' || currentPeriod === '12h') {
+            // Court : afficher heure:minute
+            label = time.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        } else if (currentPeriod === '24h') {
+            // 24h : afficher heure:minute
             label = time.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
         } else if (currentPeriod === '7d') {
+            // 7 jours : jour de la semaine + numéro
             label = time.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' });
         } else if (currentPeriod === '30d') {
+            // 30 jours : jour + mois
             label = time.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
         }
 

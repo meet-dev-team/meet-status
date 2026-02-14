@@ -210,26 +210,30 @@ body {
 
 .chart-controls {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     background: #f3f4f6;
     padding: 4px;
     border-radius: 8px;
+    flex-wrap: wrap;
+    /* Pour mobile */
 }
 
 .period-btn {
     background: transparent;
     border: none;
     border-radius: 6px;
-    padding: 6px 12px;
-    font-size: 13px;
+    padding: 6px 10px;
+    font-size: 12px;
     cursor: pointer;
     font-weight: 500;
     color: var(--text-secondary);
     transition: all 0.2s;
+    min-width: 42px;
 }
 
 .period-btn:hover {
     color: var(--text-main);
+    background: rgba(255, 255, 255, 0.5);
 }
 
 .period-btn.active {
@@ -289,6 +293,9 @@ canvas {
     .period-btn {
         flex: 1;
         text-align: center;
+        min-width: 38px;
+        padding: 6px 8px;
+        font-size: 11px;
     }
 
     .component-item {
