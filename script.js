@@ -271,22 +271,39 @@ function drawChart(data, isOffline = false, mousePos = null) {
     const hasGapMarkers = data.some(d => d.is_gap === true);
     const realDataPoints = hasGapMarkers ? data.filter(d => !d.is_gap) : data;
 
-    if (realDataPoints.length < 2) {
+    if (realDataPoints.length < 1) {
         ctx.fillStyle = '#666';
         ctx.textAlign = 'center';
         ctx.font = '14px sans-serif';
-        ctx.fillText('Pas assez de données pour afficher le graphique', width / 2, height / 2);
+        ctx.fillText('Pas de données disponibles pour cette période', width / 2, height / 2);
         return;
     }
 
     let maxVal = Math.max(100, ...realDataPoints.map(d => d.response_time)) * 1.2;
     if (isOffline) maxVal = Math.max(maxVal, 500);
 
-    const timeStart = new Date(realDataPoints[0].created_at).getTime();
-    const timeEnd = new Date(realDataPoints[realDataPoints.length - 1].created_at).getTime();
-    
+    // ✅ CHANGEMENT ICI : Calculer l'échelle de temps basée sur la période demandée
     const now = Date.now();
-    const timeRange = (isOffline ? now : timeEnd) - timeStart;
+    let periodMs;
+    
+    switch(currentPeriod) {
+        case '24h':
+            periodMs = 24 * 60 * 60 * 1000;
+            break;
+        case '7d':
+            periodMs = 7 * 24 * 60 * 60 * 1000;
+            break;
+        case '30d':
+            periodMs = 30 * 24 * 60 * 60 * 1000;
+            break;
+        default:
+            periodMs = 24 * 60 * 60 * 1000;
+    }
+    
+    // Toujours afficher toute la période demandée
+    const timeEnd = now;
+    const timeStart = now - periodMs;
+    const timeRange = periodMs;
 
     const getX = (time) => {
         return padding.left + ((time - timeStart) / timeRange) * chartWidth;
@@ -324,6 +341,7 @@ function drawChart(data, isOffline = false, mousePos = null) {
     if (hasGapMarkers) {
         // Nouveau système avec marqueurs de gap
         let lastRealPointIndex = 0;
+        let hasDrawnFirstPoint = false;
 
         data.forEach((item, index) => {
             if (item.is_gap) {
@@ -352,8 +370,8 @@ function drawChart(data, isOffline = false, mousePos = null) {
                 ctx.moveTo(startX, prevY);
                 ctx.lineTo(endX, nextY);
                 ctx.strokeStyle = '#EF4444';
-                ctx.lineWidth = 3; // Ligne plus épaisse sur mobile
-                ctx.setLineDash([6, 6]); // Pointillés plus visibles
+                ctx.lineWidth = 3;
+                ctx.setLineDash([6, 6]);
                 ctx.stroke();
                 
                 ctx.beginPath();
@@ -361,6 +379,7 @@ function drawChart(data, isOffline = false, mousePos = null) {
                 ctx.lineWidth = 2;
                 ctx.setLineDash([]);
                 ctx.moveTo(endX, nextY);
+                hasDrawnFirstPoint = true;
                 
                 return;
             }
@@ -369,8 +388,9 @@ function drawChart(data, isOffline = false, mousePos = null) {
             const x = getX(time);
             const y = getY(item.response_time);
 
-            if (index === 0) {
+            if (!hasDrawnFirstPoint) {
                 ctx.moveTo(x, y);
+                hasDrawnFirstPoint = true;
             } else {
                 const prevItem = data[index - 1];
                 if (prevItem && prevItem.is_gap) {
@@ -383,14 +403,20 @@ function drawChart(data, isOffline = false, mousePos = null) {
     } else {
         // Ancien système - détection client-side
         const GAP_THRESHOLD = 15 * 60 * 1000;
+        let hasDrawnFirstPoint = false;
 
         realDataPoints.forEach((item, index) => {
             const time = new Date(item.created_at).getTime();
+            
+            // ✅ Ne tracer que les points dans la période visible
+            if (time < timeStart || time > timeEnd) return;
+            
             const x = getX(time);
             const y = getY(item.response_time);
             
-            if (index === 0) {
+            if (!hasDrawnFirstPoint) {
                 ctx.moveTo(x, y);
+                hasDrawnFirstPoint = true;
             } else {
                 const prevItem = realDataPoints[index - 1];
                 const prevTime = new Date(prevItem.created_at).getTime();
@@ -423,7 +449,7 @@ function drawChart(data, isOffline = false, mousePos = null) {
     
     ctx.stroke();
 
-    // Draw X Axis Labels
+    // Draw X Axis Labels - ✅ Basé sur la période complète
     ctx.fillStyle = '#999';
     ctx.textAlign = 'center';
     ctx.font = '10px sans-serif';
