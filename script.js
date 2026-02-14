@@ -357,12 +357,16 @@ function drawChart(data, isOffline = false, mousePos = null) {
 
         data.forEach((item, index) => {
             if (item.is_gap) {
-                ctx.stroke();
-                
                 const startTime = new Date(item.created_at).getTime();
                 const endTime = new Date(item.created_at_end).getTime();
-                const startX = getX(startTime);
-                const endX = getX(endTime);
+                
+                // ✅ Ne tracer le gap que s'il est dans la période visible
+                if (endTime < timeStart || startTime > timeEnd) return;
+                
+                ctx.stroke();
+                
+                const startX = getX(Math.max(startTime, timeStart)); // Limiter au début de la zone
+                const endX = getX(Math.min(endTime, timeEnd)); // Limiter à la fin de la zone
                 
                 let prevY = padding.top + chartHeight / 2;
                 let nextY = padding.top + chartHeight / 2;
@@ -397,6 +401,10 @@ function drawChart(data, isOffline = false, mousePos = null) {
             }
 
             const time = new Date(item.created_at).getTime();
+            
+            // ✅ Ne tracer que les points dans la période visible
+            if (time < timeStart || time > timeEnd) return;
+            
             const x = getX(time);
             const y = getY(item.response_time);
 
