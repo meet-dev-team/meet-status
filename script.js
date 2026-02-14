@@ -348,127 +348,102 @@ function drawChart(data, isOffline = false, mousePos = null) {
     ctx.strokeStyle = defaultColor;
     ctx.lineWidth = 2;
     ctx.setLineDash([]);
-    ctx.beginPath();
-
-    if (hasGapMarkers) {
-        // Nouveau système avec marqueurs de gap
-        let lastRealPointIndex = 0;
-        let hasDrawnFirstPoint = false;
-
-        data.forEach((item, index) => {
-            if (item.is_gap) {
-                const startTime = new Date(item.created_at).getTime();
-                const endTime = new Date(item.created_at_end).getTime();
-                
-                // ✅ Ne tracer le gap que s'il intersecte avec la période visible
-                if (endTime < timeStart) return; // Trop ancien, on ignore
-                
-                ctx.stroke();
-                
-                // Limiter aux bords de la zone visible
-                const startX = getX(Math.max(startTime, timeStart));
-                const endX = getX(Math.min(endTime, timeEnd));
-                
-                let prevY = padding.top + chartHeight / 2;
-                let nextY = padding.top + chartHeight / 2;
-                
-                for (let i = lastRealPointIndex; i < realDataPoints.length; i++) {
-                    const pointTime = new Date(realDataPoints[i].created_at).getTime();
-                    if (pointTime <= startTime) {
-                        prevY = getY(realDataPoints[i].response_time);
-                        lastRealPointIndex = i;
-                    } else {
-                        nextY = getY(realDataPoints[i].response_time);
-                        break;
-                    }
-                }
-                
-                ctx.beginPath();
-                ctx.moveTo(startX, prevY);
-                ctx.lineTo(endX, nextY);
-                ctx.strokeStyle = '#EF4444';
-                ctx.lineWidth = 3;
-                ctx.setLineDash([6, 6]);
-                ctx.stroke();
-                
-                ctx.beginPath();
-                ctx.strokeStyle = defaultColor;
-                ctx.lineWidth = 2;
-                ctx.setLineDash([]);
-                ctx.moveTo(endX, nextY);
-                hasDrawnFirstPoint = true;
-                
-                return;
-            }
-
-            const time = new Date(item.created_at).getTime();
-            
-            // ✅ Ne filtrer que les points trop anciens (pas ceux qui sont récents)
-            if (time < timeStart) return;
-            
-            const x = getX(time);
-            const y = getY(item.response_time);
-
-            if (!hasDrawnFirstPoint) {
-                ctx.moveTo(x, y);
-                hasDrawnFirstPoint = true;
-            } else {
-                const prevItem = data[index - 1];
-                if (prevItem && prevItem.is_gap) {
-                    ctx.moveTo(x, y);
-                } else {
-                    ctx.lineTo(x, y);
-                }
-            }
-        });
-    } else {
-        // Ancien système - détection client-side
-        const GAP_THRESHOLD = 15 * 60 * 1000;
-        let hasDrawnFirstPoint = false;
-
-        realDataPoints.forEach((item, index) => {
-            const time = new Date(item.created_at).getTime();
-            
-            // ✅ Ne filtrer que les points trop anciens (pas ceux qui sont récents)
-            if (time < timeStart) return;
-            
-            const x = getX(time);
-            const y = getY(item.response_time);
-            
-            if (!hasDrawnFirstPoint) {
-                ctx.moveTo(x, y);
-                hasDrawnFirstPoint = true;
-            } else {
-                const prevItem = realDataPoints[index - 1];
-                const prevTime = new Date(prevItem.created_at).getTime();
-                
-                if (time - prevTime > GAP_THRESHOLD) {
-                    ctx.stroke();
-
-                    const prevX = getX(prevTime);
-                    const prevY = getY(prevItem.response_time);
-
-                    ctx.beginPath();
-                    ctx.moveTo(prevX, prevY);
-                    ctx.lineTo(x, y);
-                    ctx.strokeStyle = '#EF4444';
-                    ctx.lineWidth = 3;
-                    ctx.setLineDash([6, 6]);
-                    ctx.stroke();
-
-                    ctx.beginPath();
-                    ctx.strokeStyle = defaultColor;
-                    ctx.lineWidth = 2;
-                    ctx.setLineDash([]);
-                    ctx.moveTo(x, y);
-                } else {
-                    ctx.lineTo(x, y);
-                }
-            }
-        });
+    
+    // ✅ Trouver le premier et dernier point de données réels
+    const firstPoint = realDataPoints[0];
+    const lastPoint = realDataPoints[realDataPoints.length - 1];
+    const firstTime = new Date(firstPoint.created_at).getTime();
+    const lastTime = new Date(lastPoint.created_at).getTime();
+    
+    // ✅ 1. Ligne du bord gauche jusqu'au premier point (si nécessaire)
+    if (firstTime > timeStart) {
+        ctx.beginPath();
+        ctx.moveTo(padding.left, getY(firstPoint.response_time));
+        ctx.lineTo(getX(firstTime), getY(firstPoint.response_time));
+        ctx.stroke();
     }
     
+    // ✅ 2. Tracer la courbe principale
+    ctx.beginPath();
+    let hasDrawnFirstPoint = false;
+    let lastRealPointIndex = 0;
+
+    data.forEach((item, index) => {
+        if (item.is_gap) {
+            const startTime = new Date(item.created_at).getTime();
+            const endTime = new Date(item.created_at_end).getTime();
+            
+            // Ne tracer le gap que s'il intersecte avec la période visible
+            if (endTime < timeStart) return;
+            
+            ctx.stroke();
+            
+            // Limiter aux bords de la zone visible
+            const startX = getX(Math.max(startTime, timeStart));
+            const endX = getX(Math.min(endTime, timeEnd));
+            
+            let prevY = padding.top + chartHeight / 2;
+            let nextY = padding.top + chartHeight / 2;
+            
+            for (let i = lastRealPointIndex; i < realDataPoints.length; i++) {
+                const pointTime = new Date(realDataPoints[i].created_at).getTime();
+                if (pointTime <= startTime) {
+                    prevY = getY(realDataPoints[i].response_time);
+                    lastRealPointIndex = i;
+                } else {
+                    nextY = getY(realDataPoints[i].response_time);
+                    break;
+                }
+            }
+            
+            ctx.beginPath();
+            ctx.moveTo(startX, prevY);
+            ctx.lineTo(endX, nextY);
+            ctx.strokeStyle = '#EF4444';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([6, 6]);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.strokeStyle = defaultColor;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([]);
+            ctx.moveTo(endX, nextY);
+            hasDrawnFirstPoint = true;
+            
+            return;
+        }
+
+        const time = new Date(item.created_at).getTime();
+        
+        // Ne filtrer que les points trop anciens
+        if (time < timeStart) return;
+        
+        const x = getX(time);
+        const y = getY(item.response_time);
+
+        if (!hasDrawnFirstPoint) {
+            ctx.moveTo(x, y);
+            hasDrawnFirstPoint = true;
+        } else {
+            const prevItem = data[index - 1];
+            if (prevItem && prevItem.is_gap) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        }
+    });
+    
     ctx.stroke();
+    
+    // ✅ 3. Ligne du dernier point jusqu'au bord droit (maintenant)
+    if (lastTime < timeEnd) {
+        ctx.beginPath();
+        ctx.moveTo(getX(lastTime), getY(lastPoint.response_time));
+        ctx.lineTo(padding.left + chartWidth, getY(lastPoint.response_time));
+        ctx.stroke();
+    }
 
     // Draw X Axis Labels - ✅ Basé sur la période complète
     ctx.fillStyle = '#999';
@@ -527,43 +502,6 @@ function drawChart(data, isOffline = false, mousePos = null) {
         let p2 = null;
         let isInGap = false;
         let gapInfo = null;
-
-        // Vérifier si on est dans un gap
-        if (hasGapMarkers) {
-            for (let i = 0; i < data.length; i++) {
-                if (data[i].is_gap) {
-                    const gapStart = new Date(data[i].created_at).getTime();
-                    const gapEnd = new Date(data[i].created_at_end).getTime();
-                    if (timeAtCursor >= gapStart && timeAtCursor <= gapEnd) {
-                        isInGap = true;
-                        gapInfo = {
-                            start: gapStart,
-                            end: gapEnd,
-                            startDate: new Date(gapStart),
-                            endDate: new Date(gapEnd)
-                        };
-                        break;
-                    }
-                }
-            }
-        } else {
-            // Ancien système : vérifier les gaps avec threshold
-            const GAP_THRESHOLD = 15 * 60 * 1000;
-            for (let i = 0; i < realDataPoints.length - 1; i++) {
-                const t1 = new Date(realDataPoints[i].created_at).getTime();
-                const t2 = new Date(realDataPoints[i+1].created_at).getTime();
-                if (timeAtCursor >= t1 && timeAtCursor <= t2 && (t2 - t1 > GAP_THRESHOLD)) {
-                    isInGap = true;
-                    gapInfo = {
-                        start: t1,
-                        end: t2,
-                        startDate: new Date(t1),
-                        endDate: new Date(t2)
-                    };
-                    break;
-                }
-            }
-        }
 
         // SI ON EST DANS UN GAP - Afficher tooltip "Hors ligne"
         if (isInGap && gapInfo) {
