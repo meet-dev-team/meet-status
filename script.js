@@ -535,9 +535,34 @@ function drawChart(data, isOffline = false, mousePos = null) {
                 durationText = `${durationMinutes}min`;
             }
 
+            // Vérifier si le gap traverse des jours différents
+            const startDay = gapInfo.startDate.toLocaleDateString('fr-FR');
+            const endDay = gapInfo.endDate.toLocaleDateString('fr-FR');
+            const sameDayGap = startDay === endDay;
+
             // Draw Tooltip Box - ROUGE avec "Hors ligne"
-            const startTimeStr = gapInfo.startDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-            const endTimeStr = gapInfo.endDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+            let startTimeStr, endTimeStr;
+            
+            if (sameDayGap) {
+                // Même jour : afficher juste les heures
+                startTimeStr = gapInfo.startDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+                endTimeStr = gapInfo.endDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+            } else {
+                // Jours différents : afficher date + heure
+                startTimeStr = gapInfo.startDate.toLocaleString('fr-FR', { 
+                    day: 'numeric', 
+                    month: 'short', 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+                endTimeStr = gapInfo.endDate.toLocaleString('fr-FR', { 
+                    day: 'numeric', 
+                    month: 'short', 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+            }
+            
             const tooltipText = `🔴 Hors ligne (${durationText})`;
             const tooltipSubText = `${startTimeStr} → ${endTimeStr}`;
             
