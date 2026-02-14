@@ -227,6 +227,7 @@ function drawChart(data, isOffline = false, mousePos = null) {
     const timeStart = new Date(data[0].created_at).getTime();
     const timeEnd = new Date(data[data.length - 1].created_at).getTime();
     
+    // If offline, use "now" as end of range to show gap until present
     const now = Date.now();
     const timeRange = (isOffline ? now : timeEnd) - timeStart;
 
@@ -257,29 +258,35 @@ function drawChart(data, isOffline = false, mousePos = null) {
     }
     ctx.stroke();
 
-    // Draw Graph Line
+    // Draw Graph Line with GAP DETECTION
     ctx.beginPath();
-    let points = [];
+    const GAP_THRESHOLD = 15 * 60 * 1000; // 15 minutes gap = broken line
+
     data.forEach((item, index) => {
         const time = new Date(item.created_at).getTime();
         const x = getX(time);
         const y = getY(item.response_time);
-        points.push({ x, y, item, time });
         
-        if (index === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+        if (index === 0) {
+            ctx.moveTo(x, y);
+        } else {
+            const prevTime = new Date(data[index - 1].created_at).getTime();
+            if (time - prevTime > GAP_THRESHOLD) {
+                 // Gap detected: Stroke current path and start new one
+                 ctx.stroke();
+                 ctx.beginPath();
+                 ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        }
     });
     
     ctx.strokeStyle = '#017EFF';
     if (isOffline) ctx.strokeStyle = '#94a3b8'; 
     ctx.lineWidth = 2;
+    // Stroke the final segment
     ctx.stroke();
-
-    // Fill Area under graph
-    ctx.lineTo(getX(new Date(data[data.length-1].created_at).getTime()), padding.top + chartHeight);
-    ctx.lineTo(getX(new Date(data[0].created_at).getTime()), padding.top + chartHeight);
-    ctx.fillStyle = isOffline ? 'rgba(148, 163, 184, 0.1)' : 'rgba(1, 126, 255, 0.1)';
-    ctx.fill();
 
     // Draw X Axis Labels (Time)
     ctx.fillStyle = '#999';
@@ -315,14 +322,19 @@ function drawChart(data, isOffline = false, mousePos = null) {
         for (let i = 0; i < data.length - 1; i++) {
             const t1 = new Date(data[i].created_at).getTime();
             const t2 = new Date(data[i+1].created_at).getTime();
+            // Check if we are inside a gap
             if (timeAtCursor >= t1 && timeAtCursor <= t2) {
+                if (t2 - t1 > GAP_THRESHOLD) {
+                    // We are in a gap! Don't show tooltip, or show "Data missing"
+                    return; 
+                }
                 p1 = data[i];
                 p2 = data[i+1];
                 break;
             }
         }
 
-        // If we found the interval
+        // If we found the interval and it's not a gap
         if (p1 && p2) {
             const t1 = new Date(p1.created_at).getTime();
             const t2 = new Date(p2.created_at).getTime();
