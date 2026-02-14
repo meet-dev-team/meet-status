@@ -11,7 +11,9 @@
     --font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-* { box-sizing: border-box; }
+* {
+    box-sizing: border-box;
+}
 
 body {
     font-family: var(--font-family);
@@ -52,7 +54,10 @@ body {
     font-weight: 500;
     transition: opacity 0.2s;
 }
-.back-link:hover { opacity: 0.8; }
+
+.back-link:hover {
+    opacity: 0.8;
+}
 
 .status-overview {
     background: var(--card-bg);
@@ -88,9 +93,17 @@ body {
 }
 
 @keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
-    70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    0% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+    }
+
+    70% {
+        box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    }
 }
 
 .headline {
@@ -136,8 +149,14 @@ body {
     align-items: center;
     transition: background-color 0.2s;
 }
-.component-item:hover { background-color: #fcfcfc; }
-.component-item:last-child { border-bottom: none; }
+
+.component-item:hover {
+    background-color: #fcfcfc;
+}
+
+.component-item:last-child {
+    border-bottom: none;
+}
 
 .component-name {
     font-weight: 600;
@@ -209,12 +228,14 @@ body {
     transition: all 0.2s;
 }
 
-.period-btn:hover { color: var(--text-main); }
+.period-btn:hover {
+    color: var(--text-main);
+}
 
 .period-btn.active {
     background: white;
     color: var(--primary);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 canvas {
@@ -239,11 +260,38 @@ canvas {
 }
 
 @media (max-width: 600px) {
-    .container { padding: 30px 16px; }
-    .status-overview { flex-direction: column; text-align: center; gap: 16px; padding: 24px; }
-    .status-text-group { flex-direction: column; }
-    .chart-header { flex-direction: column; gap: 16px; align-items: flex-start; }
-    .chart-controls { width: 100%; justify-content: space-between; }
-    .period-btn { flex: 1; text-align: center; }
-    .component-item { padding: 16px; }
+    .container {
+        padding: 30px 16px;
+    }
+
+    .status-overview {
+        flex-direction: column;
+        text-align: center;
+        gap: 16px;
+        padding: 24px;
+    }
+
+    .status-text-group {
+        flex-direction: column;
+    }
+
+    .chart-header {
+        flex-direction: column;
+        gap: 16px;
+        align-items: flex-start;
+    }
+
+    .chart-controls {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .period-btn {
+        flex: 1;
+        text-align: center;
+    }
+
+    .component-item {
+        padding: 16px;
+    }
 }
