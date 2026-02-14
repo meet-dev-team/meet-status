@@ -1,4 +1,4 @@
-const API_URL = 'https://meet.baptisteaussant.com/api/status-data'; 
+const API_URL = 'https://meet.baptisteaussant.com/api/status-data';
 
 const statusColors = {
     operational: '#10B981',
@@ -24,7 +24,7 @@ let isDataOffline = false; // Store offline state for chart
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     fetchStatus();
-    
+
     // Setup period buttons
     document.querySelectorAll('.period-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // Chart Interaction
+    // Chart Interaction - MOUSE
     const canvas = document.getElementById('response-chart');
     
     canvas.addEventListener('mousemove', (e) => {
@@ -51,6 +51,39 @@ document.addEventListener('DOMContentLoaded', () => {
         drawChart(chartData, isDataOffline, null); // Clear tooltip
     });
 
+    // Chart Interaction - TOUCH (Mobile)
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (!chartData || chartData.length < 2) return;
+        const rect = canvas.getBoundingClientRect();
+        const touch = e.touches[0];
+        const x = touch.clientX - rect.left;
+        const y = touch.clientY - rect.top;
+        drawChart(chartData, isDataOffline, { x, y });
+    });
+
+    canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (!chartData || chartData.length < 2) return;
+        const rect = canvas.getBoundingClientRect();
+        const touch = e.touches[0];
+        const x = touch.clientX - rect.left;
+        const y = touch.clientY - rect.top;
+        drawChart(chartData, isDataOffline, { x, y });
+    });
+
+    canvas.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        if (!chartData) return;
+        drawChart(chartData, isDataOffline, null); // Clear tooltip
+    });
+
+    canvas.addEventListener('touchcancel', (e) => {
+        e.preventDefault();
+        if (!chartData) return;
+        drawChart(chartData, isDataOffline, null);
+    });
+
     // Polling every 60 seconds
     updateInterval = setInterval(fetchStatus, 60000);
 });
@@ -61,7 +94,7 @@ async function fetchStatus() {
         if (!response.ok) throw new Error('Network response was not ok');
         
         const json = await response.json();
-
+        
         if (json.success) {
             // Save to cache
             localStorage.setItem('status_cache', JSON.stringify({
@@ -75,6 +108,7 @@ async function fetchStatus() {
             const now = new Date();
             document.getElementById('last-updated').textContent = `Dernière vérification : ${now.toLocaleTimeString()}`;
         }
+        
     } catch (error) {
         console.error('Failed to fetch status', error);
         handleOffline();
@@ -87,11 +121,11 @@ function handleOffline() {
     document.getElementById('global-status-indicator').style.backgroundColor = statusColors.major_outage;
     document.getElementById('global-status-indicator').classList.remove('pulse');
     document.getElementById('last-updated').textContent = `Dernière tentative : ${new Date().toLocaleTimeString()} (Échec)`;
-    
+
     // 2. Try to load cache
     const cached = localStorage.getItem('status_cache');
     let data = null;
-
+    
     if (cached) {
         try {
             const parsed = JSON.parse(cached);
@@ -150,27 +184,28 @@ function updateUI(data, isOffline = false) {
     data.components.forEach(component => {
         const item = document.createElement('div');
         item.className = 'component-item';
-        
+
         const nameGroup = document.createElement('div');
         nameGroup.className = 'component-name-group';
-        
+
         const name = document.createElement('span');
         name.className = 'component-name';
         name.textContent = component.name;
+        
         if (isOffline) {
             name.style.color = '#999';
         }
-        
+
         nameGroup.appendChild(name);
 
         const statusGroup = document.createElement('div');
         statusGroup.className = 'component-status-group';
 
         if (component.responseTime !== undefined) {
-             const ping = document.createElement('span');
-             ping.className = 'component-ping';
-             ping.textContent = `${component.responseTime}ms`;
-             statusGroup.appendChild(ping);
+            const ping = document.createElement('span');
+            ping.className = 'component-ping';
+            ping.textContent = `${component.responseTime}ms`;
+            statusGroup.appendChild(ping);
         }
 
         const statusText = document.createElement('span');
@@ -178,9 +213,8 @@ function updateUI(data, isOffline = false) {
         // Force offline color if offline
         statusText.style.color = isOffline ? statusColors.offline : (statusColors[component.status] || '#ccc');
         statusText.textContent = isOffline ? 'Hors ligne' : statusLabels[component.status];
-        
         statusGroup.appendChild(statusText);
-        
+
         item.appendChild(nameGroup);
         item.appendChild(statusGroup);
         componentsList.appendChild(item);
@@ -212,8 +246,11 @@ function drawChart(data, isOffline = false, mousePos = null) {
 
     ctx.clearRect(0, 0, width, height);
 
+    // Vérifier si les données contiennent des marqueurs de gap (nouveau système)
+    const hasGapMarkers = data.some(d => d.is_gap === true);
+    
     // Filtrer les données pour ne garder que les points réels (pas les marqueurs de gap)
-    const realDataPoints = data.filter(d => !d.is_gap);
+    const realDataPoints = hasGapMarkers ? data.filter(d => !d.is_gap) : data;
 
     if (realDataPoints.length < 2) {
         ctx.fillStyle = '#666';
@@ -261,33 +298,34 @@ function drawChart(data, isOffline = false, mousePos = null) {
     }
     ctx.stroke();
 
-    // Draw Graph Line with GAP DETECTION FROM DATABASE
+    // Draw Graph Line
     const defaultColor = isOffline ? '#94a3b8' : '#017EFF';
     ctx.strokeStyle = defaultColor;
     ctx.lineWidth = 2;
     ctx.setLineDash([]);
     ctx.beginPath();
 
-    let lastRealPointIndex = 0;
+    if (hasGapMarkers) {
+        // NOUVEAU SYSTÈME : Utiliser les marqueurs de gap de la DB
+        let lastRealPointIndex = 0;
 
-    data.forEach((item, index) => {
-        // Si c'est un marqueur de gap de la DB
-        if (item.is_gap) {
-            // 1. Finir la ligne actuelle
-            ctx.stroke();
-            
-            // 2. Dessiner la ligne rouge en pointillés pour le gap
-            const startTime = new Date(item.created_at).getTime();
-            const endTime = new Date(item.created_at_end).getTime();
-            const startX = getX(startTime);
-            const endX = getX(endTime);
-            
-            // Trouver les Y des points avant et après le gap
-            let prevY = padding.top + chartHeight / 2;
-            let nextY = padding.top + chartHeight / 2;
-            
-            // Point avant le gap
-            if (lastRealPointIndex < realDataPoints.length) {
+        data.forEach((item, index) => {
+            // Si c'est un marqueur de gap de la DB
+            if (item.is_gap) {
+                // 1. Finir la ligne actuelle
+                ctx.stroke();
+                
+                // 2. Dessiner la ligne rouge en pointillés pour le gap
+                const startTime = new Date(item.created_at).getTime();
+                const endTime = new Date(item.created_at_end).getTime();
+                const startX = getX(startTime);
+                const endX = getX(endTime);
+                
+                // Trouver les Y des points avant et après le gap
+                let prevY = padding.top + chartHeight / 2;
+                let nextY = padding.top + chartHeight / 2;
+                
+                // Point avant le gap
                 for (let i = lastRealPointIndex; i < realDataPoints.length; i++) {
                     const pointTime = new Date(realDataPoints[i].created_at).getTime();
                     if (pointTime <= startTime) {
@@ -298,51 +336,96 @@ function drawChart(data, isOffline = false, mousePos = null) {
                         break;
                     }
                 }
+                
+                ctx.beginPath();
+                ctx.moveTo(startX, prevY);
+                ctx.lineTo(endX, nextY);
+                ctx.strokeStyle = '#EF4444'; // Rouge
+                ctx.setLineDash([4, 4]);
+                ctx.stroke();
+                
+                // 3. Reprendre la ligne normale
+                ctx.beginPath();
+                ctx.strokeStyle = defaultColor;
+                ctx.setLineDash([]);
+                ctx.moveTo(endX, nextY);
+                
+                return;
             }
-            
-            ctx.beginPath();
-            ctx.moveTo(startX, prevY);
-            ctx.lineTo(endX, nextY);
-            ctx.strokeStyle = '#EF4444'; // Rouge
-            ctx.setLineDash([4, 4]);
-            ctx.stroke();
-            
-            // 3. Reprendre la ligne normale
-            ctx.beginPath();
-            ctx.strokeStyle = defaultColor;
-            ctx.setLineDash([]);
-            ctx.moveTo(endX, nextY);
-            
-            return;
-        }
 
-        // Traiter les points de données normaux
-        const time = new Date(item.created_at).getTime();
-        const x = getX(time);
-        const y = getY(item.response_time);
+            // Traiter les points de données normaux
+            const time = new Date(item.created_at).getTime();
+            const x = getX(time);
+            const y = getY(item.response_time);
 
-        if (index === 0) {
-            ctx.moveTo(x, y);
-        } else {
-            // Vérifier si le point précédent était un gap
-            const prevItem = data[index - 1];
-            if (prevItem && prevItem.is_gap) {
-                // Ne pas tracer de ligne, juste se déplacer au nouveau point
+            if (index === 0) {
                 ctx.moveTo(x, y);
             } else {
-                ctx.lineTo(x, y);
+                // Vérifier si le point précédent était un gap
+                const prevItem = data[index - 1];
+                if (prevItem && prevItem.is_gap) {
+                    // Ne pas tracer de ligne, juste se déplacer au nouveau point
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
             }
-        }
-    });
+        });
+    } else {
+        // ANCIEN SYSTÈME : Détection client-side des gaps (fallback)
+        const GAP_THRESHOLD = 15 * 60 * 1000; // 15 minutes gap
+
+        realDataPoints.forEach((item, index) => {
+            const time = new Date(item.created_at).getTime();
+            const x = getX(time);
+            const y = getY(item.response_time);
+            
+            if (index === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                const prevItem = realDataPoints[index - 1];
+                const prevTime = new Date(prevItem.created_at).getTime();
+                
+                if (time - prevTime > GAP_THRESHOLD) {
+                    // --- GAP DETECTED ---
+                    // 1. Draw the valid line up to previous point
+                    ctx.stroke();
+
+                    // 2. Draw the GAP line (Red Dashed)
+                    const prevX = getX(prevTime);
+                    const prevY = getY(prevItem.response_time);
+
+                    ctx.beginPath();
+                    ctx.moveTo(prevX, prevY);
+                    ctx.lineTo(x, y);
+                    ctx.strokeStyle = '#EF4444'; // Red
+                    ctx.setLineDash([4, 4]);
+                    ctx.stroke();
+
+                    // 3. Prepare for next valid line
+                    ctx.beginPath();
+                    ctx.strokeStyle = defaultColor; // Back to blue/grey
+                    ctx.setLineDash([]);
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+        });
+    }
     
     // Stroke the final segment
     ctx.stroke();
 
-    // Draw X Axis Labels (Time)
+    // Draw X Axis Labels (Time) - Amélioré pour 7j et 30j
     ctx.fillStyle = '#999';
     ctx.textAlign = 'center';
+    ctx.font = '10px sans-serif';
     
-    const labelCount = 5;
+    let labelCount = 5;
+    if (currentPeriod === '7d') labelCount = 7;
+    if (currentPeriod === '30d') labelCount = 6;
+    
     for (let i = 0; i < labelCount; i++) {
         const ratio = i / (labelCount - 1);
         const x = padding.left + ratio * chartWidth;
@@ -350,9 +433,13 @@ function drawChart(data, isOffline = false, mousePos = null) {
         
         let label = '';
         if (currentPeriod === '24h') {
-            label = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        } else {
-            label = time.toLocaleDateString([], { month: 'short', day: 'numeric' });
+            label = time.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        } else if (currentPeriod === '7d') {
+            // Format court pour 7 jours
+            label = time.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' });
+        } else if (currentPeriod === '30d') {
+            // Format pour 30 jours
+            label = time.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
         }
 
         ctx.fillText(label, x, height - 10);
@@ -369,12 +456,25 @@ function drawChart(data, isOffline = false, mousePos = null) {
         let p2 = null;
         let isInGap = false;
 
-        // Vérifier d'abord si on est dans un gap
-        for (let i = 0; i < data.length; i++) {
-            if (data[i].is_gap) {
-                const gapStart = new Date(data[i].created_at).getTime();
-                const gapEnd = new Date(data[i].created_at_end).getTime();
-                if (timeAtCursor >= gapStart && timeAtCursor <= gapEnd) {
+        // Si nouveau système : vérifier d'abord si on est dans un gap
+        if (hasGapMarkers) {
+            for (let i = 0; i < data.length; i++) {
+                if (data[i].is_gap) {
+                    const gapStart = new Date(data[i].created_at).getTime();
+                    const gapEnd = new Date(data[i].created_at_end).getTime();
+                    if (timeAtCursor >= gapStart && timeAtCursor <= gapEnd) {
+                        isInGap = true;
+                        break;
+                    }
+                }
+            }
+        } else {
+            // Ancien système : vérifier les gaps avec threshold
+            const GAP_THRESHOLD = 15 * 60 * 1000;
+            for (let i = 0; i < realDataPoints.length - 1; i++) {
+                const t1 = new Date(realDataPoints[i].created_at).getTime();
+                const t2 = new Date(realDataPoints[i+1].created_at).getTime();
+                if (timeAtCursor >= t1 && timeAtCursor <= t2 && (t2 - t1 > GAP_THRESHOLD)) {
                     isInGap = true;
                     break;
                 }
@@ -431,8 +531,8 @@ function drawChart(data, isOffline = false, mousePos = null) {
 
             // Draw Tooltip Box
             const date = new Date(timeAtCursor);
-            const timeStr = date.toLocaleTimeString();
-            const dateStr = date.toLocaleDateString();
+            const timeStr = date.toLocaleTimeString('fr-FR');
+            const dateStr = date.toLocaleDateString('fr-FR');
             const valStr = `${Math.round(interpolatedValue)} ms`;
 
             const tooltipText = `${dateStr} ${timeStr} - ${valStr}`;
