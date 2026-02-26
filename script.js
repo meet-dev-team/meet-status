@@ -503,6 +503,25 @@ function drawChart(data, isOffline = false, mousePos = null) {
         let isInGap = false;
         let gapInfo = null;
 
+        if (hasGapMarkers) {
+            for (let i = 0; i < data.length; i++) {
+                if (data[i].is_gap) {
+                    const start = new Date(data[i].created_at).getTime();
+                    const end = new Date(data[i].created_at_end).getTime();
+                    if (timeAtCursor > start && timeAtCursor < end) {
+                        isInGap = true;
+                        gapInfo = {
+                            start: start,
+                            end: end,
+                            startDate: new Date(start),
+                            endDate: new Date(end)
+                        };
+                        break;
+                    }
+                }
+            }
+        }
+
         // SI ON EST DANS UN GAP - Afficher tooltip "Hors ligne"
         if (isInGap && gapInfo) {
             const x = mousePos.x;
