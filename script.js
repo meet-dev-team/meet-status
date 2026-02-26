@@ -5,7 +5,7 @@ const statusColors = {
     degraded_performance: '#F59E0B',
     partial_outage: '#F97316',
     major_outage: '#EF4444',
-    offline: '#94a3b8'
+    offline: '#EF4444'
 };
 
 const statusLabels = {
@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Chart Interaction - MOUSE
     const canvas = document.getElementById('response-chart');
-    
+
     canvas.addEventListener('mousemove', (e) => {
         if (!chartData || chartData.length < 2) return;
         const rect = canvas.getBoundingClientRect();
@@ -57,32 +57,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     canvas.addEventListener('touchstart', (e) => {
         if (!chartData || chartData.length < 2) return;
-        
+
         // Empêcher le scroll SEULEMENT si on touche le canvas
         e.preventDefault();
         isTouching = true;
-        
+
         const rect = canvas.getBoundingClientRect();
         const touch = e.touches[0];
         const x = touch.clientX - rect.left;
         const y = touch.clientY - rect.top;
-        
+
         drawChart(chartData, isDataOffline, { x, y });
     }, { passive: false });
 
     canvas.addEventListener('touchmove', (e) => {
         if (!chartData || chartData.length < 2 || !isTouching) return;
-        
+
         e.preventDefault();
-        
+
         const rect = canvas.getBoundingClientRect();
         const touch = e.touches[0];
         const x = touch.clientX - rect.left;
         const y = touch.clientY - rect.top;
-        
+
         // Throttle le redraw pour éviter les lags
         if (touchTimeout) return;
-        
+
         touchTimeout = setTimeout(() => {
             drawChart(chartData, isDataOffline, { x, y });
             touchTimeout = null;
@@ -92,9 +92,9 @@ document.addEventListener('DOMContentLoaded', () => {
     canvas.addEventListener('touchend', (e) => {
         e.preventDefault();
         isTouching = false;
-        
+
         if (!chartData) return;
-        
+
         // Garder le tooltip visible un instant avant de le cacher
         setTimeout(() => {
             if (!isTouching) {
@@ -123,23 +123,23 @@ async function fetchStatus() {
     try {
         const response = await fetch(`${API_URL}?period=${currentPeriod}`);
         if (!response.ok) throw new Error('Network response was not ok');
-        
+
         const json = await response.json();
-        
+
         if (json.success) {
             // Save to cache
             localStorage.setItem('status_cache', JSON.stringify({
                 timestamp: Date.now(),
                 data: json.data
             }));
-            
+
             updateUI(json.data);
-            
+
             // Update timestamp
             const now = new Date();
             document.getElementById('last-updated').textContent = `Dernière vérification : ${now.toLocaleTimeString('fr-FR')}`;
         }
-        
+
     } catch (error) {
         console.error('Failed to fetch status', error);
         handleOffline();
@@ -149,12 +149,13 @@ async function fetchStatus() {
 function handleOffline() {
     document.getElementById('global-status-text').textContent = 'Hors ligne';
     document.getElementById('global-status-indicator').style.backgroundColor = statusColors.major_outage;
+    document.querySelector('.status-overview').style.borderColor = statusColors.major_outage;
     document.getElementById('global-status-indicator').classList.remove('pulse');
     document.getElementById('last-updated').textContent = `Dernière tentative : ${new Date().toLocaleTimeString('fr-FR')} (Échec)`;
 
     const cached = localStorage.getItem('status_cache');
     let data = null;
-    
+
     if (cached) {
         try {
             const parsed = JSON.parse(cached);
@@ -192,10 +193,11 @@ function updateUI(data, isOffline = false) {
         const systemStatus = data.system.status;
         const globalIndicator = document.getElementById('global-status-indicator');
         const globalText = document.getElementById('global-status-text');
-        
+
         globalIndicator.style.backgroundColor = statusColors[systemStatus] || statusColors.operational;
+        document.querySelector('.status-overview').style.borderColor = statusColors[systemStatus] || statusColors.operational;
         globalText.textContent = systemStatus === 'operational' ? 'Tous les systèmes sont opérationnels' : statusLabels[systemStatus];
-        
+
         if (systemStatus === 'operational') {
             globalIndicator.className = 'status-indicator pulse';
         } else {
@@ -216,7 +218,7 @@ function updateUI(data, isOffline = false) {
         const name = document.createElement('span');
         name.className = 'component-name';
         name.textContent = component.name;
-        
+
         if (isOffline) {
             name.style.color = '#999';
         }
@@ -285,8 +287,8 @@ function drawChart(data, isOffline = false, mousePos = null) {
     // ✅ CHANGEMENT ICI : Calculer l'échelle de temps basée sur la période demandée
     const now = Date.now();
     let periodMs;
-    
-    switch(currentPeriod) {
+
+    switch (currentPeriod) {
         case '1h':
             periodMs = 1 * 60 * 60 * 1000;
             break;
@@ -311,7 +313,7 @@ function drawChart(data, isOffline = false, mousePos = null) {
         default:
             periodMs = 24 * 60 * 60 * 1000;
     }
-    
+
     // Toujours afficher toute la période demandée
     const timeEnd = now;
     const timeStart = now - periodMs;
@@ -329,12 +331,12 @@ function drawChart(data, isOffline = false, mousePos = null) {
     ctx.strokeStyle = '#e0e0e0';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    
+
     for (let i = 0; i <= 4; i++) {
         const y = padding.top + (i / 4) * chartHeight;
         ctx.moveTo(padding.left, y);
         ctx.lineTo(padding.left + chartWidth, y);
-        
+
         ctx.fillStyle = '#999';
         ctx.textAlign = 'right';
         ctx.font = '10px sans-serif';
@@ -348,13 +350,13 @@ function drawChart(data, isOffline = false, mousePos = null) {
     ctx.strokeStyle = defaultColor;
     ctx.lineWidth = 2;
     ctx.setLineDash([]);
-    
+
     // ✅ Trouver le premier et dernier point de données réels
     const firstPoint = realDataPoints[0];
     const lastPoint = realDataPoints[realDataPoints.length - 1];
     const firstTime = new Date(firstPoint.created_at).getTime();
     const lastTime = new Date(lastPoint.created_at).getTime();
-    
+
     // ✅ 1. Ligne du bord gauche jusqu'au premier point (si nécessaire)
     if (firstTime > timeStart) {
         ctx.beginPath();
@@ -362,7 +364,7 @@ function drawChart(data, isOffline = false, mousePos = null) {
         ctx.lineTo(getX(firstTime), getY(firstPoint.response_time));
         ctx.stroke();
     }
-    
+
     // ✅ 2. Tracer la courbe principale
     ctx.beginPath();
     let hasDrawnFirstPoint = false;
@@ -372,19 +374,19 @@ function drawChart(data, isOffline = false, mousePos = null) {
         if (item.is_gap) {
             const startTime = new Date(item.created_at).getTime();
             const endTime = new Date(item.created_at_end).getTime();
-            
+
             // Ne tracer le gap que s'il intersecte avec la période visible
             if (endTime < timeStart) return;
-            
+
             ctx.stroke();
-            
+
             // Limiter aux bords de la zone visible
             const startX = getX(Math.max(startTime, timeStart));
             const endX = getX(Math.min(endTime, timeEnd));
-            
+
             let prevY = padding.top + chartHeight / 2;
             let nextY = padding.top + chartHeight / 2;
-            
+
             for (let i = lastRealPointIndex; i < realDataPoints.length; i++) {
                 const pointTime = new Date(realDataPoints[i].created_at).getTime();
                 if (pointTime <= startTime) {
@@ -395,7 +397,7 @@ function drawChart(data, isOffline = false, mousePos = null) {
                     break;
                 }
             }
-            
+
             ctx.beginPath();
             ctx.moveTo(startX, prevY);
             ctx.lineTo(endX, nextY);
@@ -403,22 +405,22 @@ function drawChart(data, isOffline = false, mousePos = null) {
             ctx.lineWidth = 3;
             ctx.setLineDash([6, 6]);
             ctx.stroke();
-            
+
             ctx.beginPath();
             ctx.strokeStyle = defaultColor;
             ctx.lineWidth = 2;
             ctx.setLineDash([]);
             ctx.moveTo(endX, nextY);
             hasDrawnFirstPoint = true;
-            
+
             return;
         }
 
         const time = new Date(item.created_at).getTime();
-        
+
         // Ne filtrer que les points trop anciens
         if (time < timeStart) return;
-        
+
         const x = getX(time);
         const y = getY(item.response_time);
 
@@ -434,9 +436,9 @@ function drawChart(data, isOffline = false, mousePos = null) {
             }
         }
     });
-    
+
     ctx.stroke();
-    
+
     // ✅ 3. Ligne du dernier point jusqu'au bord droit (maintenant)
     if (lastTime < timeEnd) {
         ctx.beginPath();
@@ -449,7 +451,7 @@ function drawChart(data, isOffline = false, mousePos = null) {
     ctx.fillStyle = '#999';
     ctx.textAlign = 'center';
     ctx.font = '10px sans-serif';
-    
+
     let labelCount = 5;
     if (currentPeriod === '1h' || currentPeriod === '2h') {
         labelCount = 6;
@@ -464,14 +466,14 @@ function drawChart(data, isOffline = false, mousePos = null) {
     } else if (currentPeriod === '30d') {
         labelCount = 6;
     }
-    
+
     for (let i = 0; i < labelCount; i++) {
         const ratio = i / (labelCount - 1);
         const x = padding.left + ratio * chartWidth;
         const time = new Date(timeStart + ratio * timeRange);
-        
+
         let label = '';
-        
+
         // Format adapté selon la période
         if (currentPeriod === '1h' || currentPeriod === '2h') {
             // Très court : afficher heure:minute:seconde ou juste minute
@@ -497,7 +499,7 @@ function drawChart(data, isOffline = false, mousePos = null) {
     if (mousePos && mousePos.x >= padding.left && mousePos.x <= padding.left + chartWidth) {
         const ratio = (mousePos.x - padding.left) / chartWidth;
         const timeAtCursor = timeStart + ratio * timeRange;
-        
+
         let p1 = null;
         let p2 = null;
         let isInGap = false;
@@ -525,7 +527,7 @@ function drawChart(data, isOffline = false, mousePos = null) {
         // SI ON EST DANS UN GAP - Afficher tooltip "Hors ligne"
         if (isInGap && gapInfo) {
             const x = mousePos.x;
-            
+
             // Calculer la position Y (au milieu du graphique)
             const y = padding.top + chartHeight / 2;
 
@@ -553,7 +555,7 @@ function drawChart(data, isOffline = false, mousePos = null) {
             const durationMinutes = Math.round(durationMs / 60000);
             const durationHours = Math.floor(durationMinutes / 60);
             const remainingMinutes = durationMinutes % 60;
-            
+
             let durationText = '';
             if (durationHours > 0) {
                 durationText = `${durationHours}h${remainingMinutes > 0 ? remainingMinutes + 'm' : ''}`;
@@ -568,30 +570,30 @@ function drawChart(data, isOffline = false, mousePos = null) {
 
             // Draw Tooltip Box - ROUGE avec "Hors ligne"
             let startTimeStr, endTimeStr;
-            
+
             if (sameDayGap) {
                 // Même jour : afficher juste les heures
                 startTimeStr = gapInfo.startDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
                 endTimeStr = gapInfo.endDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
             } else {
                 // Jours différents : afficher date + heure
-                startTimeStr = gapInfo.startDate.toLocaleString('fr-FR', { 
-                    day: 'numeric', 
-                    month: 'short', 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
+                startTimeStr = gapInfo.startDate.toLocaleString('fr-FR', {
+                    day: 'numeric',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit'
                 });
-                endTimeStr = gapInfo.endDate.toLocaleString('fr-FR', { 
-                    day: 'numeric', 
-                    month: 'short', 
-                    hour: '2-digit', 
-                    minute: '2-digit' 
+                endTimeStr = gapInfo.endDate.toLocaleString('fr-FR', {
+                    day: 'numeric',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit'
                 });
             }
-            
+
             const tooltipText = `🔴 Hors ligne (${durationText})`;
             const tooltipSubText = `${startTimeStr} → ${endTimeStr}`;
-            
+
             ctx.font = 'bold 12px sans-serif';
             const textWidth1 = ctx.measureText(tooltipText).width;
             ctx.font = '11px sans-serif';
@@ -630,18 +632,18 @@ function drawChart(data, isOffline = false, mousePos = null) {
             ctx.fillText(tooltipText, boxX + boxWidth / 2, boxY + 18);
             ctx.font = '11px sans-serif';
             ctx.fillText(tooltipSubText, boxX + boxWidth / 2, boxY + 33);
-            
+
             return; // Ne pas afficher le tooltip normal
         }
 
         // SINON - Chercher les points réels autour du curseur (tooltip normal)
         for (let i = 0; i < realDataPoints.length - 1; i++) {
             const t1 = new Date(realDataPoints[i].created_at).getTime();
-            const t2 = new Date(realDataPoints[i+1].created_at).getTime();
-            
+            const t2 = new Date(realDataPoints[i + 1].created_at).getTime();
+
             if (timeAtCursor >= t1 && timeAtCursor <= t2) {
                 p1 = realDataPoints[i];
-                p2 = realDataPoints[i+1];
+                p2 = realDataPoints[i + 1];
                 break;
             }
         }
@@ -651,7 +653,7 @@ function drawChart(data, isOffline = false, mousePos = null) {
             const t1 = new Date(p1.created_at).getTime();
             const t2 = new Date(p2.created_at).getTime();
             const factor = (timeAtCursor - t1) / (t2 - t1);
-            
+
             const v1 = p1.response_time;
             const v2 = p2.response_time;
             const interpolatedValue = v1 + factor * (v2 - v1);
