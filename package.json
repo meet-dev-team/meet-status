@@ -1,0 +1,11 @@
+{
+  "name": "meet-status",
+  "version": "1.0.0",
+  "description": "Page d'état des services Meet",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

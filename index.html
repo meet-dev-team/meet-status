@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>État du Service - Meet</title>
+    <meta name="description" content="Consultez en temps réel l'état des services, le temps de réponse de l'API et la disponibilité des composants de Meet.">
     <link rel="icon" href="favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="style.css">
     <!-- Fonts -->
@@ -15,12 +16,12 @@
 
 <body>
     <div class="container">
-        <div class="header">
+        <header class="header">
             <div class="logo">
                 <span>Meet API Status</span>
             </div>
-            <a href="https://meet.baptisteaussant.com" class="back-link">&larr; Retour au site</a>
-        </div>
+            <a href="/" id="back-to-site-link" class="back-link">&larr; Retour au site</a>
+        </header>
 
         <div class="status-overview">
             <div class="status-text-group">
@@ -30,34 +31,35 @@
             <div class="last-checked" id="last-updated">Dernière vérification : -</div>
         </div>
 
-        <div class="components-section">
+        <section class="components-section">
             <h2 class="section-title">État des Services</h2>
             <div id="components-list">
                 <div class="loading-state">Connexion au serveur...</div>
             </div>
-        </div>
+        </section>
 
-        <div class="chart-container">
+        <section class="chart-container">
             <div class="chart-header">
                 <span class="chart-title">Temps de Réponse API</span>
                 <div class="chart-controls">
-                    <button class="period-btn" data-period="1h">1h</button>
-                    <button class="period-btn" data-period="2h">2h</button>
-                    <button class="period-btn" data-period="6h">6h</button>
-                    <button class="period-btn" data-period="12h">12h</button>
-                    <button class="period-btn active" data-period="24h">24h</button>
-                    <button class="period-btn" data-period="7d">7j</button>
-                    <button class="period-btn" data-period="30d">30j</button>
+                    <button class="period-btn" id="period-btn-1h" data-period="1h">1h</button>
+                    <button class="period-btn" id="period-btn-2h" data-period="2h">2h</button>
+                    <button class="period-btn" id="period-btn-6h" data-period="6h">6h</button>
+                    <button class="period-btn" id="period-btn-12h" data-period="12h">12h</button>
+                    <button class="period-btn active" id="period-btn-24h" data-period="24h">24h</button>
+                    <button class="period-btn" id="period-btn-7d" data-period="7d">7j</button>
+                    <button class="period-btn" id="period-btn-30d" data-period="30d">30j</button>
                 </div>
             </div>
             <canvas id="response-chart"></canvas>
-        </div>
+        </section>
 
-        <div class="footer">
+        <footer class="footer">
             <p>Données fournies par Meet.</p>
-        </div>
+        </footer>
     </div>
 
+    <script src="config.js"></script>
     <script src="script.js"></script>
 </body>
 

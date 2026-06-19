@@ -1,0 +1,6 @@
+# Fichiers de configuration spécifiques à l'environnement
+# Ne JAMAIS commiter ces fichiers — ils contiennent des données sensibles
+config.js
+.env
+node_modules/
+.vercel
