@@ -1,4 +1,5 @@
-const API_URL = 'https://meet.baptisteaussant.com/api/status-data';
+const API_URL = window.APP_CONFIG?.API_URL || '/api/status-data';
+const BACK_LINK = window.APP_CONFIG?.BACK_LINK || '/';
 
 const statusColors = {
     operational: '#10B981',
@@ -24,6 +25,10 @@ let isTouching = false; // Pour empêcher le scroll pendant le touch sur le canv
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+    // Mise à jour dynamique du lien de retour depuis la configuration
+    const backLink = document.getElementById('back-to-site-link');
+    if (backLink) backLink.href = BACK_LINK;
+
     fetchStatus();
 
     // Setup period buttons
