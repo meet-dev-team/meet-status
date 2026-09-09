@@ -3,9 +3,16 @@
   "version": "1.0.0",
   "description": "Page d'état des services Meet",
   "scripts": {
-    "build": "node build.js"
+    "build": "node build.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "jest": "^30.5.1",
+    "jest-environment-jsdom": "^30.5.1"
   }
 }
