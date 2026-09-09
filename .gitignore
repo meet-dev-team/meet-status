@@ -2,5 +2,26 @@
 # Ne JAMAIS commiter ces fichiers — ils contiennent des données sensibles
 config.js
 .env
+.env.*
+!.env.example
 node_modules/
 .vercel
+
+# Tests & Couverture
+coverage/
+.nyc_output/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS & Éditeurs
+.DS_Store
+**/.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+.vscode/
+.idea/
+*.swp
+
